@@ -1145,7 +1145,7 @@ void fetchStravaData() {
     HTTPClient http;
     String req = "https://www.strava.com/api/v3/athlete/activities?";
     req += "after=" + String(afterTS) + "&before=" + String(beforeTS);
-    req += "&per_page=200&page=" + String(page);
+    req += "&per_page=30&page=" + String(page);
     
     http.begin(req);
     http.addHeader("Authorization", "Bearer " + accessToken);
@@ -1160,9 +1160,19 @@ void fetchStravaData() {
     }
     
     String payload = http.getString();
+
+    // Only parse the fields we need — drastically reduces memory usage
+    JsonDocument filter;
+    filter[0]["type"] = true;
+    filter[0]["name"] = true;
+    filter[0]["start_date_local"] = true;
+    filter[0]["distance"] = true;
+    filter[0]["moving_time"] = true;
+    filter[0]["map"]["summary_polyline"] = true;
+
     JsonDocument doc;
-    
-    if (deserializeJson(doc, payload)) {
+
+    if (deserializeJson(doc, payload, DeserializationOption::Filter(filter))) {
       USBSerial.println("JSON parse error");
       http.end();
       break;
