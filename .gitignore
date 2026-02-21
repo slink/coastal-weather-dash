@@ -1,0 +1,5 @@
+# Worktrees
+.worktrees/
+
+# Private config with WiFi credentials
+firmware/config.h
