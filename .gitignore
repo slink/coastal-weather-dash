@@ -3,3 +3,9 @@
 
 # Private config with WiFi credentials
 firmware/config.h
+
+# Personal notes
+sglink.md
+
+# Python
+__pycache__/
