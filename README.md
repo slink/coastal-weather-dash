@@ -57,6 +57,50 @@ The Flash Mode one is important. Ask me how I know.
 
 ---
 
+## arduino-cli (Alternative)
+
+If you prefer the command line over the IDE:
+
+```bash
+# Install ESP32 board support
+arduino-cli core install esp32:esp32@2.0.17
+
+# The sketch must live in a directory matching its name
+cp firmware/CoastalWeather_V1.ino /tmp/CoastalWeather_V1/CoastalWeather_V1.ino
+cp firmware/config.h firmware/weather_icons.h /tmp/CoastalWeather_V1/
+cp -r firmware/Fonts /tmp/CoastalWeather_V1/
+
+# Compile
+arduino-cli compile \
+  --fqbn esp32:esp32:esp32s3:CDCOnBoot=default,USBMode=default,FlashMode=dio,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB \
+  --build-property "compiler.cpp.extra_flags=-I/tmp/CoastalWeather_V1" \
+  /tmp/CoastalWeather_V1
+
+# Upload — must enter bootloader mode first! (see below)
+arduino-cli upload \
+  --fqbn esp32:esp32:esp32s3:CDCOnBoot=default,USBMode=default,FlashMode=dio,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB \
+  --port /dev/cu.usbmodem* \
+  /tmp/CoastalWeather_V1
+
+# Watch serial output (port changes after reboot — re-run ls /dev/cu.usb* to find it)
+arduino-cli monitor --port /dev/cu.usbmodem* --config baudrate=115200
+```
+
+The copy-to-tmp step is annoying but necessary — Arduino requires the `.ino` file to live in a directory with the same name, and our repo structure doesn't match that.
+
+### Entering Bootloader Mode
+
+The board won't accept uploads while running normally. You need to enter bootloader (download) mode first:
+
+1. **Unplug** the USB cable
+2. **Hold the BOOT button**
+3. **Plug the USB cable back in** while still holding BOOT
+4. **Release BOOT** after a couple seconds
+
+The port name will change (typically to something like `/dev/cu.usbmodem142101`). Run `ls /dev/cu.usb*` to find it, then use that port for the upload command. After flashing, the board reboots and the port changes again — re-check before opening the serial monitor.
+
+---
+
 ## Buttons
 
 | Button | What it does |
