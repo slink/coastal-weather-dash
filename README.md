@@ -6,7 +6,7 @@ An e-paper dashboard that shows weather, tides, and surf conditions. Battery pow
 
 ## What It Does
 
-Shows current weather, today's tides, surf conditions, and a 7-day forecast on a 7.5" color e-ink display. Updates six times a day (6am, 9am, 12pm, 3pm, 6pm, 9pm) and sleeps the rest of the time. Runs for weeks on a single charge.
+Shows current weather, today's tides, surf conditions, and a 7-day forecast on a 7.5" color e-ink display. Battery level and charging status are shown in the header bar. Updates six times a day (6am, 9am, 12pm, 3pm, 6pm, 9pm) and sleeps the rest of the time. Runs for weeks on a single charge.
 
 That's it. That's the project.
 
