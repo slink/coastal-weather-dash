@@ -1,69 +1,59 @@
-# 🪶 Ibis Dash - Strava E-Paper Dashboard
+# Coastal Weather Dashboard
 
-An e-paper dashboard that shows your Strava stats. Written with a ton of frustration, mass amounts of trial and error, and the help of Claude. But hey, it works now!
+An e-paper dashboard that shows weather, tides, and surf conditions. Battery powered, auto-updates throughout the day, looks great on a shelf. No API keys needed.
 
 ---
 
 ## What It Does
 
-Shows your running/cycling/swimming/hiking/walking stats on a nice e-ink screen. Distance, time, activity count, your route, progress toward your yearly goal. Updates automatically. Runs on battery for weeks. Looks cool on your desk.
+Shows current weather, today's tides, surf conditions, and a 7-day forecast on a 7.5" color e-ink display. Updates six times a day (6am, 9am, 12pm, 3pm, 6pm, 9pm) and sleeps the rest of the time. Runs for weeks on a single charge.
 
 That's it. That's the project.
 
 ---
 
-## What I Used
+## What You Need
 
 - **Waveshare ESP32-S3-PhotoPainter** - comes with the 7.5" color e-paper display already attached, LiPo battery, and USB-C cable all included
 - **Arduino IDE** - free
-- **Ibis Setup app** - included here, also free (I made it)
-- **A Strava account** - you probably have one if you're here
+
+That's the whole shopping list. The data sources are all free public APIs - no accounts, no keys, no subscriptions.
 
 ---
 
-## How Hard Is This?
+## Setup
 
-If you can follow instructions, you can do this. The actual coding part is done - you just upload my code to the board and configure it with the app. No coding required on your end.
+1. Install [Arduino IDE](https://www.arduino.cc/en/software)
+2. Add ESP32 board support (v2.0.17) via Board Manager
+3. Install libraries: **GxEPD2**, **ArduinoJson**, **XPowersLib**
+4. Copy `firmware/config.example.h` to `firmware/config.h`
+5. Edit `config.h` with your WiFi credentials, coordinates, and station IDs
+6. Set the board settings below (the Flash Mode one matters!)
+7. Upload `firmware/CoastalWeather_V1.ino`
+8. Done. Go check the surf.
 
-The "hardest" part is getting Strava API credentials, and even that takes like 5 minutes.
+### Finding Your Station IDs
 
----
-
-## Setup (The Short Version)
-
-1. Install Arduino IDE
-2. Add ESP32 board support
-3. Install some libraries (GxEPD2, ArduinoJson, XPowersLib, QRCode)
-4. Set the right board settings (see below - this part matters!)
-5. Upload `IBIS_V31.ino` to your board
-6. Open `Ibis.exe`, connect, enter WiFi + Strava credentials
-7. Done. Go for a run.
+- **Tide station:** Find yours at [tidesandcurrents.noaa.gov](https://tidesandcurrents.noaa.gov/) - search by location, grab the station ID from the URL
+- **Buoy station:** Find yours at [ndbc.noaa.gov](https://www.ndbc.noaa.gov/) - click the nearest buoy on the map
 
 ---
 
 ## Arduino IDE Settings
 
-⚠️ **Get these right or your board will be sad:**
+Get these right or your board will be sad:
 
 | Setting | Value |
 |---------|-------|
 | Board | ESP32S3 Dev Module |
 | USB CDC On Boot | Disabled |
+| USB Mode | USB-OTG (TinyUSB) |
 | Flash Mode | **DIO** (NOT OPI!) |
 | Flash Size | 16MB (128Mb) |
 | PSRAM | OPI PSRAM |
 | Partition Scheme | 16M Flash (3MB APP/9.9MB FATFS) |
 
 The Flash Mode one is important. Ask me how I know.
-
----
-
-## Getting Strava API Stuff
-
-1. Go to [strava.com/settings/api](https://www.strava.com/settings/api)
-2. Create an app (name it whatever, set callback domain to `localhost`)
-3. Copy the Client ID and Client Secret into the Ibis Setup app
-4. Click "Get Refresh Token" - it opens a browser, you authorize, done
 
 ---
 
@@ -80,39 +70,44 @@ The Flash Mode one is important. Ask me how I know.
 ## What's In Here
 
 ```
-ibis-dash/
+coastal-weather-dash/
 ├── firmware/
-│   ├── IBIS_V31.ino    ← The Arduino code
-│   └── ibis_logos.h    ← Pixel art logos (yes I made these)
-├── app/
-│   ├── Ibis.exe        ← Windows setup app
-│   └── Ibis.py         ← Python source if you're curious
+│   ├── CoastalWeather_V1.ino  ← The Arduino code
+│   ├── config.example.h       ← Copy to config.h, add your settings
+│   ├── weather_icons.h        ← Generated icon bitmaps
+│   └── Fonts/                 ← Custom display fonts
+├── tools/
+│   ├── generate_icons.py      ← Icon generation pipeline
+│   ├── png_to_4bpp.py         ← PNG to PROGMEM converter
+│   └── icons/                 ← Source PNGs for weather icons
 ├── docs/
-│   └── USER_MANUAL.md  ← More detailed instructions if you get stuck
-├── README.md           ← You are here
-└── LICENSE             ← MIT-ish, see below
+│   └── plans/                 ← Design documents
+├── README.md                  ← You are here
+└── LICENSE                    ← MIT
 ```
 
 ---
 
-## Why "Ibis"?
+## Data Sources
 
-Because, believe it or not, I am a bird. 🪶
+All free, all public, no API keys required:
 
----
-
-## License
-
-MIT - use it, modify it, make it better. Just don't make it commercial without my consent.
+| Data | Source | What it provides |
+|------|--------|-----------------|
+| Weather | [Open-Meteo](https://open-meteo.com/) | Current conditions + 7-day forecast |
+| Tides | [NOAA CO-OPS](https://tidesandcurrents.noaa.gov/) | Tide predictions by station |
+| Surf | [NOAA NDBC](https://www.ndbc.noaa.gov/) | Real-time buoy wave height and period |
 
 ---
 
 ## Credits
 
-Built with [GxEPD2](https://github.com/ZinggJM/GxEPD2), [ArduinoJson](https://arduinojson.org/), [XPowersLib](https://github.com/lewisxhe/XPowersLib), the Strava API, mass debugging, mass coffee, and mass vibes.
+Forked from [Ibis Dash](https://github.com/jdlcdl/ibis-dash) by jdlcdl - an excellent Strava e-paper dashboard that provided the hardware platform, power management, and display infrastructure this project builds on.
 
-Shoutout to Nerdland and some fellow nerds. 🤓
+Built with [GxEPD2](https://github.com/ZinggJM/GxEPD2), [ArduinoJson](https://arduinojson.org/), and [XPowersLib](https://github.com/lewisxhe/XPowersLib).
 
 ---
 
-Happy tracking! 🏃‍♂️🪶
+## License
+
+MIT - use it, modify it, make it better.
