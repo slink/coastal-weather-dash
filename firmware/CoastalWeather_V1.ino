@@ -1,7 +1,7 @@
 // ==============================================================================
-// ||                    SC WEATHER DASHBOARD - VERSION 1.0                    ||
+// ||                 COASTAL WEATHER DASHBOARD - VERSION 1.0                   ||
 // ||                                                                          ||
-// ||  Santa Cruz Weather, Tide & Surf dashboard on 7-color e-ink display      ||
+// ||  Weather, tide & surf dashboard on 7-color e-ink display                 ||
 // ||                                                                          ||
 // ||  DATA SOURCES:                                                           ||
 // ||  - Weather: Open-Meteo API (free, no key required)                       ||
@@ -63,7 +63,7 @@
 #include "soc/rtc_cntl_reg.h"
 #include <Preferences.h>
 
-// USB Composite Device - Makes board identify as "SC Weather" to PCs
+// USB Composite Device - Makes board identify as "Coastal Weather" to PCs
 // CDC (serial) + HID (prevents aggressive USB power management)
 #include "USB.h"
 #include "USBHID.h"
@@ -600,8 +600,8 @@ WeatherDummyHID weatherDummyDevice;
 
 void initUSBComposite() {
   // Set custom USB device identity - this is what PCs see in Device Manager
-  USB.productName("SC Weather");
-  USB.manufacturerName("SC Weather");
+  USB.productName("Coastal Weather");
+  USB.manufacturerName("Coastal Weather");
 
   // Use Espressif's VID (0x303A) - safe for hobbyist/small projects
   // Custom PID to distinguish from generic ESP32 devices
@@ -1247,7 +1247,7 @@ void drawWeatherDashboard() {
     display.setFont(&fonnts_com_Maison_Neue_Bold24pt7b);
     display.setTextColor(GxEPD_WHITE);
     display.setCursor(20, 48);
-    display.print("SANTA CRUZ WEATHER");
+    display.print("COASTAL WEATHER");
 
     // Update time - right aligned
     display.setFont(&fonnts_com_Maison_Neue_Light9pt7b);
@@ -1544,7 +1544,7 @@ void processSerialCommand(String command) {
 
   if (command == "PING") {
     USBSerial.println("PONG");
-    USBSerial.println("SC_WEATHER_V1");
+    USBSerial.println("COASTAL_WEATHER_V1");
   }
   else if (command == "RESTART") {
     USBSerial.println("OK");
@@ -1759,7 +1759,7 @@ void setup() {
 
   USBSerial.println("\n======================================================================");
   USBSerial.println("              SC WEATHER V1.0 - USB Composite Device");
-  USBSerial.println("              Board identifies as: SC Weather (CDC+HID)");
+  USBSerial.println("              Board identifies as: Coastal Weather (CDC+HID)");
   USBSerial.println("======================================================================");
   USBSerial.print("Configured: "); USBSerial.println(isConfigured ? "YES" : "NO");
   USBSerial.print("Boot count: "); USBSerial.println(bootCount);
@@ -1991,7 +1991,7 @@ void loop() {
     } else {
       // USB is connected - reset counter
       if (usbDisconnectCount > 0) {
-        USBSerial.print("[SC Weather] USB reconnected (was at ");
+        USBSerial.print("[Coastal Weather] USB reconnected (was at ");
         USBSerial.print(usbDisconnectCount);
         USBSerial.println("/10) - staying awake");
         usbDisconnectCount = 0;
