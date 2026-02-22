@@ -199,7 +199,7 @@ String WIFI_PASS = CFG_WIFI_PASSWORD;
 // Runtime state
 bool isUsbConnected = false;
 bool wasUsbConnected = false;
-float batteryPercentage = 0.0;
+RTC_DATA_ATTR float batteryPercentage = 0.0;
 float batteryVoltage = 0.0;
 bool lowBatteryMode = false;
 bool isCharging = false;
@@ -1186,8 +1186,51 @@ int calculateNextWakeMinutes() {
 
 
 // =============================================================================
-// SECTION 19: WEATHER DASHBOARD RENDERING
+// SECTION 19: BATTERY INDICATOR & WEATHER DASHBOARD RENDERING
 // =============================================================================
+
+void drawBatteryIndicator(int rightEdge, int y) {
+  // Calculate percentage text width for right-alignment
+  display.setFont(&fonnts_com_Maison_Neue_Light9pt7b);
+  char pctStr[6];
+  snprintf(pctStr, sizeof(pctStr), "%d%%", (int)batteryPercentage);
+  int16_t tx, ty;
+  uint16_t tw, th;
+  display.getTextBounds(pctStr, 0, 0, &tx, &ty, &tw, &th);
+
+  int pctWidth = tw;
+  int chargingWidth = isCharging ? 15 : 0;
+  // Layout: [battery 36px][nub 3px][gap 5px][pct text][gap 4px][bolt]
+  int totalWidth = 36 + 3 + 5 + pctWidth + chargingWidth;
+  int x = rightEdge - totalWidth;
+
+  // Battery body outline (36x16)
+  display.drawRect(x, y, 36, 16, GxEPD_WHITE);
+
+  // Battery nub on right edge (3x8, centered vertically)
+  display.fillRect(x + 36, y + 4, 3, 8, GxEPD_WHITE);
+
+  // Fill level proportional to batteryPercentage (0-100% -> 0-32px)
+  int fillWidth = (int)(batteryPercentage / 100.0 * 32);
+  if (fillWidth > 32) fillWidth = 32;
+  if (fillWidth > 0) {
+    display.fillRect(x + 2, y + 2, fillWidth, 12, GxEPD_WHITE);
+  }
+
+  // Percentage text to the right of the icon
+  display.setTextColor(GxEPD_WHITE);
+  display.setCursor(x + 44, y + 13);
+  display.print(pctStr);
+
+  // Charging lightning bolt
+  if (isCharging) {
+    int bx = x + 44 + pctWidth + 4;
+    int by = y + 1;
+    // Two triangles forming a zigzag bolt shape (~7x13px)
+    display.fillTriangle(bx + 4, by, bx, by + 6, bx + 5, by + 6, GxEPD_WHITE);
+    display.fillTriangle(bx + 1, by + 7, bx + 6, by + 7, bx + 2, by + 13, GxEPD_WHITE);
+  }
+}
 
 void drawWeatherDashboard() {
   USBSerial.println("=== Drawing Weather Dashboard ===");
@@ -1249,12 +1292,15 @@ void drawWeatherDashboard() {
     display.setCursor(20, 48);
     display.print("COASTAL WEATHER");
 
-    // Update time - right aligned
+    // Battery indicator - right aligned, upper row (~y=22, visual center ~y=30)
+    drawBatteryIndicator(W - 20, 22);
+
+    // Update time - right aligned, lower row
     display.setFont(&fonnts_com_Maison_Neue_Light9pt7b);
     display.setTextColor(GxEPD_WHITE);
     String updateStr = "Updated: " + lastUpdateTime;
     display.getTextBounds(updateStr, 0, 0, &tx, &ty, &tw, &th);
-    display.setCursor(W - tw - 20, 48);
+    display.setCursor(W - tw - 20, 58);
     display.print(updateStr);
 
     // ===== CURRENT WEATHER (Y=70 to Y=260) =====
