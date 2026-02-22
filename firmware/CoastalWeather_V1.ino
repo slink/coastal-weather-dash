@@ -924,9 +924,11 @@ bool fetchWeatherData() {
   filter["daily"]["precipitation_probability_max"] = true;
   filter["daily"]["time"] = true;
 
-  JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+  String payload = http.getString();
   http.end();
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
   if (error) {
     USBSerial.print("[FAIL] JSON parse: ");
@@ -1083,7 +1085,9 @@ bool fetchSurfData() {
 
   if (httpCode != 200) {
     USBSerial.print("[FAIL] Buoy API: HTTP ");
-    USBSerial.println(httpCode);
+    USBSerial.print(httpCode);
+    USBSerial.print(" - ");
+    USBSerial.println(url);
     http.end();
     return false;
   }
@@ -1393,12 +1397,12 @@ void drawWeatherDashboard() {
     display.print("TIDES");
 
     // Tide entries
-    display.setFont(&fonnts_com_Maison_Neue_Book15pt7b);
+    display.setFont(&fonnts_com_Maison_Neue_Book12pt7b);
     display.setTextColor(GxEPD_BLACK);
     int tideLineY = tideY + 28;
 
     for (int i = 0; i < tideCount && i < 4; i++) {
-      display.setCursor(tideX, tideLineY + i * 24);
+      display.setCursor(tideX, tideLineY + i * 20);
 
       char tideBuf[40];
       snprintf(tideBuf, sizeof(tideBuf), "%c %.1fft %d:%02d%s",

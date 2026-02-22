@@ -10,6 +10,6 @@
 #define LONGITUDE -122.01
 #define TIMEZONE "America/Los_Angeles"
 #define TIDE_STATION "9413450"
-#define BUOY_STATION "46042"
+#define BUOY_STATION "46236"
 
 #endif
