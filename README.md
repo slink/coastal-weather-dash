@@ -88,16 +88,34 @@ arduino-cli monitor --port /dev/cu.usbmodem* --config baudrate=115200
 
 The copy-to-tmp step is annoying but necessary — Arduino requires the `.ino` file to live in a directory with the same name, and our repo structure doesn't match that.
 
-### Entering Bootloader Mode
+### Flashing: The Full Sequence
 
-The board won't accept uploads while running normally. You need to enter bootloader (download) mode first:
+The board won't accept uploads while running normally. Here's the full flash-and-reboot cycle:
+
+**Step 1: Enter bootloader mode**
 
 1. **Unplug** the USB cable
-2. **Hold the BOOT button**
+2. **Hold the BOOT button** (keep holding)
 3. **Plug the USB cable back in** while still holding BOOT
-4. **Release BOOT** after a couple seconds
+4. **Wait 2 seconds**, then **release BOOT**
 
-The port name will change (typically to something like `/dev/cu.usbmodem142101`). Run `ls /dev/cu.usb*` to find it, then use that port for the upload command. After flashing, the board reboots and the port changes again — re-check before opening the serial monitor.
+The port name changes in bootloader mode (typically from `/dev/cu.usbmodemDCB4...` to `/dev/cu.usbmodem142101`). Run `ls /dev/cu.usb*` to find the new port, then use it for the upload command.
+
+**Step 2: Upload**
+
+Run the `arduino-cli upload` command above with the bootloader port.
+
+**Step 3: Power cycle after upload**
+
+After upload completes ("Hard resetting via RTS pin..."), the board auto-resets but may not fully boot the new firmware. To get a clean start:
+
+1. **Unplug** the USB cable
+2. **Press the PWR button** to fully power off (green LED turns off)
+3. **Plug USB back in** — board boots fresh into new firmware
+
+The port will change back to the firmware's device name. Run `ls /dev/cu.usb*` again before opening the serial monitor.
+
+**Troubleshooting:** If the upload fails with "No serial data received", you're not in bootloader mode — the port you see is the running firmware's USB CDC, not the ROM bootloader. Retry the BOOT-hold-plug sequence. The key indicator: the port name should be *different* from what you normally see.
 
 ---
 

@@ -1092,25 +1092,28 @@ bool fetchSurfData() {
     return false;
   }
 
-  String payload = http.getString();
+  // NDBC files are ~200KB — far too large for ESP32 RAM.
+  // Read only the first 3 lines from the stream (header, units, latest data).
+  WiFiClient* stream = http.getStreamPtr();
+  String lines[3];
+  int lineIdx = 0;
+
+  while (lineIdx < 3 && stream->connected()) {
+    if (stream->available()) {
+      lines[lineIdx] = stream->readStringUntil('\n');
+      lines[lineIdx].trim();
+      lineIdx++;
+    }
+    feedWatchdog();
+  }
   http.end();
 
-  // NDBC format: two header lines, then data
-  // Line 1: column names (#YY  MM DD hh mm WDIR WSPD GST  WVHT   DPD   APD MWD   PRES  ATMP  WTMP  DEWP  VIS PTDY  TIDE)
-  // Line 2: units
-  // Line 3+: data (most recent first)
-
-  int firstNewline = payload.indexOf('\n');
-  int secondNewline = payload.indexOf('\n', firstNewline + 1);
-  int thirdNewline = payload.indexOf('\n', secondNewline + 1);
-
-  if (thirdNewline < 0) {
+  if (lineIdx < 3 || lines[2].length() == 0) {
     USBSerial.println("[FAIL] Buoy data format error");
     return false;
   }
 
-  String dataLine = payload.substring(secondNewline + 1, thirdNewline);
-  dataLine.trim();
+  String dataLine = lines[2];
 
   // Parse space-separated values - WVHT is field index 8, DPD is field index 9
   int fieldIndex = 0;
@@ -1233,6 +1236,196 @@ void drawBatteryIndicator(int rightEdge, int y) {
     // Two triangles forming a zigzag bolt shape (~7x13px)
     display.fillTriangle(bx + 4, by, bx, by + 6, bx + 5, by + 6, GxEPD_WHITE);
     display.fillTriangle(bx + 1, by + 7, bx + 6, by + 7, bx + 2, by + 13, GxEPD_WHITE);
+  }
+}
+
+// =============================================================================
+// TIDE CURVE & SURF BOX DRAWING FUNCTIONS
+// =============================================================================
+
+void drawTideCurve() {
+  // Layout constants
+  const int PLOT_LEFT = 60;
+  const int PLOT_RIGHT = 580;
+  const int CURVE_Y_TOP = 282;
+  const int CURVE_Y_BOTTOM = 348;
+  const int CURVE_HEIGHT = CURVE_Y_BOTTOM - CURVE_Y_TOP;
+
+  // "TIDES" label
+  display.setFont(&fonnts_com_Maison_Neue_Bold9pt7b);
+  display.setTextColor(C_TEXT_DIM);
+  display.setCursor(20, 276);
+  display.print("TIDES");
+
+  // Guard: need at least 2 tides for a curve
+  if (tideCount < 2) {
+    display.setFont(&fonnts_com_Maison_Neue_Book12pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    display.setCursor(20, 320);
+    display.print("No tide data");
+    return;
+  }
+
+  // Convert tide times to minutes-since-midnight, fix midnight crossings
+  int tideMinutes[6];
+  for (int i = 0; i < tideCount; i++) {
+    tideMinutes[i] = tideHour[i] * 60 + tideMinute[i];
+    if (i > 0 && tideMinutes[i] < tideMinutes[i - 1]) {
+      tideMinutes[i] += 1440;  // Next day
+    }
+  }
+
+  // Find height range with 10% padding
+  float minH = tideHeight[0], maxH = tideHeight[0];
+  for (int i = 1; i < tideCount; i++) {
+    if (tideHeight[i] < minH) minH = tideHeight[i];
+    if (tideHeight[i] > maxH) maxH = tideHeight[i];
+  }
+  float range = maxH - minH;
+  if (range < 0.1) range = 1.0;  // Prevent division by zero
+  float padding = range * 0.10;
+  float padMin = minH - padding;
+  float padRange = range + 2 * padding;
+
+  // Map time to X pixel
+  int minMin = tideMinutes[0];
+  int maxMin = tideMinutes[tideCount - 1];
+  int timeSpan = maxMin - minMin;
+  if (timeSpan < 1) timeSpan = 1;
+
+  // Draw curve segment by segment (cosine interpolation)
+  for (int seg = 0; seg < tideCount - 1; seg++) {
+    int x0 = PLOT_LEFT + (int)((long)(tideMinutes[seg] - minMin) * (PLOT_RIGHT - PLOT_LEFT) / timeSpan);
+    int x1 = PLOT_LEFT + (int)((long)(tideMinutes[seg + 1] - minMin) * (PLOT_RIGHT - PLOT_LEFT) / timeSpan);
+    float h0 = tideHeight[seg];
+    float h1 = tideHeight[seg + 1];
+
+    int prevY = -1;
+    for (int px = x0; px <= x1; px++) {
+      float t = (x1 == x0) ? 0.5 : (float)(px - x0) / (float)(x1 - x0);
+      float cosT = (1.0 - cos(t * PI)) / 2.0;
+      float h = h0 + (h1 - h0) * cosT;
+      int y = CURVE_Y_BOTTOM - (int)((h - padMin) / padRange * CURVE_HEIGHT);
+
+      // Draw 3px thick line
+      display.drawPixel(px, y - 1, GxEPD_BLACK);
+      display.drawPixel(px, y, GxEPD_BLACK);
+      display.drawPixel(px, y + 1, GxEPD_BLACK);
+
+      // Fill gaps for steep sections
+      if (prevY >= 0 && abs(y - prevY) > 2) {
+        int yStart = min(y, prevY);
+        int yEnd = max(y, prevY);
+        for (int fy = yStart; fy <= yEnd; fy++) {
+          display.drawPixel(px, fy, GxEPD_BLACK);
+        }
+      }
+      prevY = y;
+    }
+    feedWatchdog();
+  }
+
+  // Draw dots and labels at each tide point
+  int16_t tx, ty;
+  uint16_t tw, th;
+
+  for (int i = 0; i < tideCount; i++) {
+    int dotX = PLOT_LEFT + (int)((long)(tideMinutes[i] - minMin) * (PLOT_RIGHT - PLOT_LEFT) / timeSpan);
+    int dotY = CURVE_Y_BOTTOM - (int)((tideHeight[i] - padMin) / padRange * CURVE_HEIGHT);
+
+    // Dot: RED for high, BLACK for low
+    uint16_t dotColor = (tideType[i] == 'H') ? GxEPD_RED : GxEPD_BLACK;
+    display.fillCircle(dotX, dotY, 4, dotColor);
+
+    // Format height string
+    char htStr[10];
+    snprintf(htStr, sizeof(htStr), "%.1fft", tideHeight[i]);
+
+    // Format time string
+    char tmStr[10];
+    int dispHour = tideHour[i];
+    const char* ampm = (dispHour >= 12) ? "p" : "a";
+    if (dispHour > 12) dispHour -= 12;
+    if (dispHour == 0) dispHour = 12;
+    snprintf(tmStr, sizeof(tmStr), "%d:%02d%s", dispHour, tideMinute[i], ampm);
+
+    display.setFont(&fonnts_com_Maison_Neue_Book9pt7b);
+
+    if (tideType[i] == 'H') {
+      // High tide: labels ABOVE the dot
+      display.setTextColor(GxEPD_RED);
+      display.getTextBounds(htStr, 0, 0, &tx, &ty, &tw, &th);
+      int labelX = dotX - tw / 2;
+      if (labelX < 5) labelX = 5;
+      if (labelX + (int)tw > 625) labelX = 625 - tw;
+      display.setCursor(labelX, dotY - 18);
+      display.print(htStr);
+
+      display.setTextColor(GxEPD_BLACK);
+      display.getTextBounds(tmStr, 0, 0, &tx, &ty, &tw, &th);
+      labelX = dotX - tw / 2;
+      if (labelX < 5) labelX = 5;
+      if (labelX + (int)tw > 625) labelX = 625 - tw;
+      display.setCursor(labelX, dotY - 6);
+      display.print(tmStr);
+    } else {
+      // Low tide: labels BELOW the dot
+      display.setTextColor(GxEPD_BLACK);
+      display.getTextBounds(htStr, 0, 0, &tx, &ty, &tw, &th);
+      int labelX = dotX - tw / 2;
+      if (labelX < 5) labelX = 5;
+      if (labelX + (int)tw > 625) labelX = 625 - tw;
+      display.setCursor(labelX, dotY + 14);
+      display.print(htStr);
+
+      display.getTextBounds(tmStr, 0, 0, &tx, &ty, &tw, &th);
+      labelX = dotX - tw / 2;
+      if (labelX < 5) labelX = 5;
+      if (labelX + (int)tw > 625) labelX = 625 - tw;
+      display.setCursor(labelX, dotY + 26);
+      display.print(tmStr);
+    }
+  }
+}
+
+void drawSurfBox() {
+  // Vertical divider
+  display.drawLine(634, 265, 634, 365, GxEPD_BLACK);
+
+  // "SURF" label
+  display.setFont(&fonnts_com_Maison_Neue_Bold9pt7b);
+  display.setTextColor(C_TEXT_DIM);
+  display.setCursor(660, 276);
+  display.print("SURF");
+
+  int16_t tx, ty;
+  uint16_t tw, th;
+
+  if (surfWaveHeight > 0) {
+    // Wave height (centered in surf box)
+    display.setFont(&fonnts_com_Maison_Neue_Bold18pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    char waveStr[15];
+    snprintf(waveStr, sizeof(waveStr), "%.0f-%.0fft",
+             surfWaveHeight * 0.7, surfWaveHeight);
+    display.getTextBounds(waveStr, 0, 0, &tx, &ty, &tw, &th);
+    display.setCursor(717 - tw / 2, 315);
+    display.print(waveStr);
+
+    // Period
+    display.setFont(&fonnts_com_Maison_Neue_Book12pt7b);
+    char perStr[12];
+    snprintf(perStr, sizeof(perStr), "@ %.0fs", surfWavePeriod);
+    display.getTextBounds(perStr, 0, 0, &tx, &ty, &tw, &th);
+    display.setCursor(717 - tw / 2, 345);
+    display.print(perStr);
+  } else {
+    display.setFont(&fonnts_com_Maison_Neue_Book12pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    String noData = "No data";
+    display.getTextBounds(noData, 0, 0, &tx, &ty, &tw, &th);
+    display.setCursor(717 - tw / 2, 320);
+    display.print(noData);
   }
 }
 
@@ -1387,58 +1580,8 @@ void drawWeatherDashboard() {
     display.drawLine(0, 260, W, 260, GxEPD_BLACK);
 
     // ===== TIDES & SURF (Y=260 to Y=370) =====
-    int tideX = 20;
-    int tideY = 280;
-
-    // TIDES label
-    display.setFont(&fonnts_com_Maison_Neue_Bold12pt7b);
-    display.setTextColor(C_TEXT_DIM);
-    display.setCursor(tideX, tideY);
-    display.print("TIDES");
-
-    // Tide entries
-    display.setFont(&fonnts_com_Maison_Neue_Book12pt7b);
-    display.setTextColor(GxEPD_BLACK);
-    int tideLineY = tideY + 28;
-
-    for (int i = 0; i < tideCount && i < 4; i++) {
-      display.setCursor(tideX, tideLineY + i * 20);
-
-      char tideBuf[40];
-      snprintf(tideBuf, sizeof(tideBuf), "%c %.1fft %d:%02d%s",
-               (tideType[i] == 'H') ? '^' : 'v',
-               tideHeight[i],
-               (tideHour[i] > 12) ? tideHour[i] - 12 : (tideHour[i] == 0 ? 12 : tideHour[i]),
-               tideMinute[i],
-               (tideHour[i] >= 12) ? "pm" : "am");
-      display.print(tideBuf);
-    }
-
-    // Vertical divider
-    display.drawLine(380, 265, 380, 365, GxEPD_BLACK);
-
-    // SURF section
-    int surfX = 400;
-    display.setFont(&fonnts_com_Maison_Neue_Bold12pt7b);
-    display.setTextColor(C_TEXT_DIM);
-    display.setCursor(surfX, tideY);
-    display.print("SURF");
-
-    display.setFont(&fonnts_com_Maison_Neue_Book18pt7b);
-    display.setTextColor(GxEPD_BLACK);
-
-    if (surfWaveHeight > 0) {
-      char surfStr[30];
-      snprintf(surfStr, sizeof(surfStr), "%.0f-%.0fft @ %.0fs",
-               surfWaveHeight * 0.7,  // Range: 70-100% of significant height
-               surfWaveHeight,
-               surfWavePeriod);
-      display.setCursor(surfX, tideY + 35);
-      display.print(surfStr);
-    } else {
-      display.setCursor(surfX, tideY + 35);
-      display.print("Data unavailable");
-    }
+    drawTideCurve();
+    drawSurfBox();
 
     // ===== DIVIDER LINE =====
     display.drawLine(0, 370, W, 370, GxEPD_BLACK);
@@ -1464,7 +1607,7 @@ void drawWeatherDashboard() {
       drawBitmap4bpp(centerX - 20, forecastStartY + 20, smallIcons[fIcon], 40, 40);
 
       // High/Low temps
-      display.setFont(&fonnts_com_Maison_Neue_Book9pt7b);
+      display.setFont(&fonnts_com_Maison_Neue_Book12pt7b);
       char tempBuf[15];
 
       // High in red if extreme
@@ -1475,7 +1618,7 @@ void drawWeatherDashboard() {
       }
       snprintf(tempBuf, sizeof(tempBuf), "%.0f/%.0f", forecastHigh[i], forecastLow[i]);
       display.getTextBounds(tempBuf, 0, 0, &tx, &ty, &tw, &th);
-      display.setCursor(centerX - tw / 2, forecastStartY + 100);
+      display.setCursor(centerX - tw / 2, forecastStartY + 72);
       display.print(tempBuf);
     }
 
