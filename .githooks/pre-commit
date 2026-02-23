@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: compile the Arduino sketch to catch syntax errors,
+# missing includes, and type mismatches before they land in git.
+#
+set -euo pipefail
+
+SKETCH_NAME="CoastalWeather_V1"
+FIRMWARE_DIR="firmware"
+FQBN="esp32:esp32:esp32s3:CDCOnBoot=default,USBMode=default,FlashMode=dio,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
+
+# Find arduino-cli: check PATH first, then common install locations
+ARDUINO_CLI=""
+if command -v arduino-cli &>/dev/null; then
+    ARDUINO_CLI="arduino-cli"
+else
+    for candidate in \
+        "$HOME/bin/arduino-cli" \
+        "$HOME/.local/bin/arduino-cli" \
+        "/usr/local/bin/arduino-cli" \
+        "/opt/homebrew/bin/arduino-cli"; do
+        if [[ -x "$candidate" ]]; then
+            ARDUINO_CLI="$candidate"
+            break
+        fi
+    done
+fi
+
+if [[ -z "$ARDUINO_CLI" ]]; then
+    echo "pre-commit: arduino-cli not found — skipping compile check"
+    exit 0
+fi
+
+# Skip if firmware hasn't changed in this commit
+STAGED_FILES=$(git diff --cached --name-only)
+if ! echo "$STAGED_FILES" | grep -q "^${FIRMWARE_DIR}/"; then
+    exit 0
+fi
+
+echo "pre-commit: compiling $SKETCH_NAME..."
+
+# Arduino requires the sketch directory name to match the .ino filename.
+# Our repo uses firmware/ so we compile from a temp copy.
+TEMP_DIR=$(mktemp -d)
+SKETCH_DIR="$TEMP_DIR/$SKETCH_NAME"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+cp -r "$FIRMWARE_DIR" "$SKETCH_DIR"
+
+if "$ARDUINO_CLI" compile \
+    --fqbn "$FQBN" \
+    --build-property "compiler.cpp.extra_flags=-I$SKETCH_DIR" \
+    "$SKETCH_DIR/$SKETCH_NAME.ino"; then
+    echo "pre-commit: compile succeeded"
+else
+    echo "pre-commit: compile FAILED — commit blocked"
+    echo "  (use 'git commit --no-verify' to bypass)"
+    exit 1
+fi

@@ -136,6 +136,8 @@ The port will change back to the firmware's device name. Run `ls /dev/cu.usb*` a
 
 ```
 coastal-weather-dash/
+├── .githooks/
+│   └── pre-commit             ← Compile check before each commit
 ├── firmware/
 │   ├── CoastalWeather_V1.ino  ← The Arduino code
 │   ├── config.example.h       ← Copy to config.h, add your settings
@@ -150,6 +152,22 @@ coastal-weather-dash/
 ├── README.md                  ← You are here
 └── LICENSE                    ← MIT
 ```
+
+---
+
+## Development
+
+After cloning, point git at the repo's hook directory:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This enables a **pre-commit hook** that compiles the firmware with `arduino-cli` before each commit, catching syntax errors and type mismatches early. The hook only runs when files under `firmware/` are staged, and skips gracefully if `arduino-cli` isn't installed.
+
+**Prerequisites:** [arduino-cli](https://arduino.github.io/arduino-cli/) with ESP32 board support (`arduino-cli core install esp32:esp32@2.0.17`).
+
+Bypass the hook when needed with `git commit --no-verify`.
 
 ---
 
