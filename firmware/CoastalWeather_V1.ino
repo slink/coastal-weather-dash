@@ -858,6 +858,10 @@ void disconnectWiFi() {
 }
 
 void initTime() {
+  // TZ env var doesn't survive deep sleep — always restore it
+  setenv("TZ", TIMEZONE_POSIX, 1);
+  tzset();
+
   // Skip NTP sync if we synced recently (saves WiFi time)
   time_t now;
   time(&now);
