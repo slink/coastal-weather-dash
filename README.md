@@ -2,6 +2,8 @@
 
 An e-paper dashboard that shows weather, tides, and surf conditions. Battery powered, auto-updates throughout the day, looks great on a shelf. No API keys needed.
 
+![Coastal Weather Dashboard](docs/dashboard.jpeg)
+
 ---
 
 ## What It Does
@@ -95,9 +97,10 @@ The board won't accept uploads while running normally. Here's the full flash-and
 **Step 1: Enter bootloader mode**
 
 1. **Unplug** the USB cable
-2. **Hold the BOOT button** (keep holding)
-3. **Plug the USB cable back in** while still holding BOOT
-4. **Wait 2 seconds**, then **release BOOT**
+2. **Press PWR** to fully power off (green LED turns off) — this prevents the running firmware from grabbing the USB port before the bootloader can
+3. **Hold the BOOT button** (keep holding)
+4. **Plug the USB cable back in** while still holding BOOT
+5. **Wait 2 seconds**, then **release BOOT**
 
 The port name changes in bootloader mode (typically from `/dev/cu.usbmodemDCB4...` to `/dev/cu.usbmodem142101`). Run `ls /dev/cu.usb*` to find the new port, then use it for the upload command.
 
