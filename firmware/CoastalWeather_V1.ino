@@ -494,10 +494,12 @@ void pmu_prepare_for_esp32_sleep() {
   PMU.enableIRQ(XPOWERS_AXP2101_VBUS_INSERT_IRQ);  // Wake on USB plug-in
   PMU.enableIRQ(XPOWERS_AXP2101_VBUS_REMOVE_IRQ);  // Detect USB removal
 
-  // Keep essential power rails on during sleep
+  // Disable non-essential power rails during sleep
+  // E-ink retains image electrostatically — no power needed
+  // pmu_configure_awake() re-enables these on next boot
   PMU.disableSleep();
-  PMU.enableALDO3();  // Keep display rail alive
-  PMU.enableALDO4();  // Keep other peripherals alive
+  PMU.disableALDO3();  // Display doesn't need power to hold image
+  PMU.disableALDO4();  // Peripherals not needed during sleep
 
   USBSerial.println("[OK] PMU ready - will wake on USB connection");
 }
@@ -505,10 +507,7 @@ void pmu_prepare_for_esp32_sleep() {
 void printBatteryStatus() {
   feedWatchdog();
 
-  // Re-read PMU to ensure fresh values
-  PMU.begin(Wire, AXP2101_SLAVE_ADDRESS, PMU_SDA, PMU_SCL);
-  delay(100);
-
+  // Read current PMU values (PMU already initialized at boot)
   isUsbConnected = PMU.isVbusIn();
   batteryVoltage = PMU.getBattVoltage() / 1000.0;
 
@@ -816,14 +815,15 @@ void connectWiFi() {
     return;
   }
 
+  // WiFi requires 80MHz+, ensure full speed
+  setCpuFrequencyMhz(240);
+
   USBSerial.print("Connecting to WiFi: ");
   USBSerial.println(WIFI_SSID);
 
-  // Power stabilization
-  for (int i = 0; i < 3; i++) {
-    delay(1000);
-    feedWatchdog();
-  }
+  // Brief power stabilization (AXP2101 rails settle in <100ms)
+  delay(500);
+  feedWatchdog();
 
   WiFi.mode(WIFI_STA);
   WiFi.setTxPower(WIFI_POWER_11dBm);
@@ -851,6 +851,10 @@ void connectWiFi() {
 void disconnectWiFi() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
+
+  // Drop CPU to 80MHz for display drawing — ~1/3 power draw
+  setCpuFrequencyMhz(80);
+  USBSerial.println("[PWR] CPU scaled to 80MHz for display phase");
 }
 
 void initTime() {
@@ -1433,12 +1437,11 @@ void drawWeatherDashboard() {
   USBSerial.println("=== Drawing Weather Dashboard ===");
   feedWatchdog();
 
-  // Power stabilization
-  delay(1000);
+  // Brief stabilization for I2C
+  delay(200);
   feedWatchdog();
 
-  PMU.begin(Wire, AXP2101_SLAVE_ADDRESS, PMU_SDA, PMU_SCL);
-  delay(500);
+  delay(100);
 
   // Check power stability
   float currentVoltage = PMU.getBattVoltage() / 1000.0;
@@ -1632,10 +1635,8 @@ void drawWeatherDashboard() {
   epd_wait_busy();
   esp_task_wdt_add(NULL);
   feedWatchdog();
-  delay(1000);
-  yield();
+  delay(200);
   USBSerial.flush();
-  delay(500);
 
   USBSerial.println("Weather dashboard update complete!");
 }
@@ -1653,7 +1654,6 @@ void updateWeatherAndDisplay() {
 
   if (WiFi.status() == WL_CONNECTED) {
     initTime();
-    delay(500);
     feedWatchdog();
 
     // Fetch all data - each independent, failure in one doesn't block others
@@ -1697,7 +1697,6 @@ void updateWeatherAndDisplay() {
   printBatteryStatus();
 
   USBSerial.println("Drawing dashboard...");
-  delay(500);
   feedWatchdog();
 
   drawWeatherDashboard();
