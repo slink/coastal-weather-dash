@@ -130,6 +130,8 @@ The port will change back to the firmware's device name. Run `ls /dev/cu.usb*` a
 | BOOT | Force screen refresh and data fetch |
 | PWR | Power on/off |
 
+**USB vs. Battery behavior:** When USB is plugged in, the board stays awake for serial commands but does **not** refresh the display. The sleep/wake schedule only runs on battery power. Unplug it and it'll sleep until the next scheduled time slot.
+
 ---
 
 ## What's In Here
