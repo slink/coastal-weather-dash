@@ -862,8 +862,8 @@ void initTime() {
     return;
   }
 
-  USBSerial.println("Syncing time with NTP (Pacific timezone)...");
-  configTzTime("PST8PDT,M3.2.0,M11.1.0", "pool.ntp.org", "time.nist.gov");
+  USBSerial.println("Syncing time with NTP...");
+  configTzTime(TIMEZONE_POSIX, "pool.ntp.org", "time.nist.gov");
 
   struct tm timeinfo;
   int attempts = 0;
@@ -1247,14 +1247,14 @@ void drawTideCurve() {
   // Layout constants
   const int PLOT_LEFT = 60;
   const int PLOT_RIGHT = 580;
-  const int CURVE_Y_TOP = 282;
-  const int CURVE_Y_BOTTOM = 348;
+  const int CURVE_Y_TOP = 286;
+  const int CURVE_Y_BOTTOM = 344;
   const int CURVE_HEIGHT = CURVE_Y_BOTTOM - CURVE_Y_TOP;
 
   // "TIDES" label
   display.setFont(&fonnts_com_Maison_Neue_Bold9pt7b);
   display.setTextColor(C_TEXT_DIM);
-  display.setCursor(20, 276);
+  display.setCursor(20, 280);
   display.print("TIDES");
 
   // Guard: need at least 2 tides for a curve
@@ -1356,33 +1356,33 @@ void drawTideCurve() {
       display.setTextColor(GxEPD_RED);
       display.getTextBounds(htStr, 0, 0, &tx, &ty, &tw, &th);
       int labelX = dotX - tw / 2;
-      if (labelX < 5) labelX = 5;
+      if (labelX < 75) labelX = 75;
       if (labelX + (int)tw > 625) labelX = 625 - tw;
-      display.setCursor(labelX, dotY - 18);
+      display.setCursor(labelX, max(dotY - 24, 278));
       display.print(htStr);
 
       display.setTextColor(GxEPD_BLACK);
       display.getTextBounds(tmStr, 0, 0, &tx, &ty, &tw, &th);
       labelX = dotX - tw / 2;
-      if (labelX < 5) labelX = 5;
+      if (labelX < 75) labelX = 75;
       if (labelX + (int)tw > 625) labelX = 625 - tw;
-      display.setCursor(labelX, dotY - 6);
+      display.setCursor(labelX, max(dotY - 8, 294));
       display.print(tmStr);
     } else {
       // Low tide: labels BELOW the dot
       display.setTextColor(GxEPD_BLACK);
       display.getTextBounds(htStr, 0, 0, &tx, &ty, &tw, &th);
       int labelX = dotX - tw / 2;
-      if (labelX < 5) labelX = 5;
+      if (labelX < 75) labelX = 75;
       if (labelX + (int)tw > 625) labelX = 625 - tw;
-      display.setCursor(labelX, dotY + 14);
+      display.setCursor(labelX, min(dotY + 20, 358));
       display.print(htStr);
 
       display.getTextBounds(tmStr, 0, 0, &tx, &ty, &tw, &th);
       labelX = dotX - tw / 2;
-      if (labelX < 5) labelX = 5;
+      if (labelX < 75) labelX = 75;
       if (labelX + (int)tw > 625) labelX = 625 - tw;
-      display.setCursor(labelX, dotY + 26);
+      display.setCursor(labelX, min(dotY + 36, 368));
       display.print(tmStr);
     }
   }
@@ -1395,7 +1395,7 @@ void drawSurfBox() {
   // "SURF" label
   display.setFont(&fonnts_com_Maison_Neue_Bold9pt7b);
   display.setTextColor(C_TEXT_DIM);
-  display.setCursor(660, 276);
+  display.setCursor(660, 280);
   display.print("SURF");
 
   int16_t tx, ty;
