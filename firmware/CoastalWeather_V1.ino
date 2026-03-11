@@ -815,9 +815,6 @@ void connectWiFi() {
     return;
   }
 
-  // WiFi requires 80MHz+, ensure full speed
-  setCpuFrequencyMhz(240);
-
   USBSerial.print("Connecting to WiFi: ");
   USBSerial.println(WIFI_SSID);
 
@@ -851,10 +848,7 @@ void connectWiFi() {
 void disconnectWiFi() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
-
-  // Drop CPU to 80MHz for display drawing — ~1/3 power draw
-  setCpuFrequencyMhz(80);
-  USBSerial.println("[PWR] CPU scaled to 80MHz for display phase");
+  USBSerial.println("[OK] WiFi off");
 }
 
 void initTime() {
